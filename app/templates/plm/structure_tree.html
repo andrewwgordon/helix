@@ -1,0 +1,53 @@
+{# Approved custom view exception (spec §15.5): no bundled FAB widget renders a
+   recursive structure tree. This template extends the standard FAB base layout
+   and uses the Bootstrap components FAB already bundles. #}
+{% extends "appbuilder/base.html" %}
+{% block content %}
+<div class="container">
+  <ol class="breadcrumb">
+    <li><a href="{{ back_url }}">{{ back_label }}</a></li>
+    <li class="active">{{ title }}</li>
+  </ol>
+
+  <div class="page-header">
+    <h3>
+      {{ title }}
+      <small>{{ root.version.item.item_number }} Rev {{ root.version.revision_label }}</small>
+      <a class="btn btn-default btn-sm pull-right" href="{{ toggle_url }}">
+        <i class="fa fa-exchange"></i> {{ toggle_label }}
+      </a>
+    </h3>
+  </div>
+
+  {% macro render_node(node) %}
+    <li class="list-group-item">
+      <a href="{{ url_for('ItemModelView.show', pk=node.version.item_id) }}">
+        {{ node.version.item.item_number }}
+      </a>
+      <span class="label label-default">Rev {{ node.version.revision_label }}</span>
+      <span class="label label-info">{{ node.version.lifecycle_state.name }}</span>
+      {% if node.relationship %}
+        {% if node.relationship.quantity %}
+          <span class="badge">&times; {{ node.relationship.quantity }}</span>
+        {% endif %}
+        {% if node.relationship.find_number %}
+          <span class="text-muted">find {{ node.relationship.find_number }}</span>
+        {% endif %}
+      {% endif %}
+      {% if node.children %}
+        <ul class="list-group plm-tree">
+          {% for child in node.children %}{{ render_node(child) }}{% endfor %}
+        </ul>
+      {% endif %}
+    </li>
+  {% endmacro %}
+
+  <ul class="list-group plm-tree-root">
+    {{ render_node(root) }}
+  </ul>
+
+  <a class="btn btn-default" href="{{ back_url }}">
+    <i class="fa fa-arrow-left"></i> {{ back_label }}
+  </a>
+</div>
+{% endblock %}

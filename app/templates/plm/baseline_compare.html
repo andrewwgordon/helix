@@ -1,0 +1,101 @@
+{# Approved custom view exception (spec §15.5): side-by-side computed diff of
+   two baselines. Extends the standard FAB base layout. #}
+{% extends "appbuilder/base.html" %}
+{% block content %}
+<div class="container">
+  <ol class="breadcrumb">
+    <li><a href="{{ url_for('BaselineModelView.list') }}">Baselines</a></li>
+    <li class="active">Compare</li>
+  </ol>
+
+  <div class="page-header">
+    <h3>Compare baselines</h3>
+  </div>
+
+  {% if diff and baseline_a and baseline_b %}
+    <p class="lead">
+      <span class="label label-default">{{ baseline_a.baseline_number }}</span>
+      <i class="fa fa-arrow-right"></i>
+      <span class="label label-default">{{ baseline_b.baseline_number }}</span>
+    </p>
+
+    <div class="row">
+      <div class="col-md-3"><h4>Added <span class="badge">{{ diff.added|length }}</span></h4></div>
+      <div class="col-md-3"><h4>Removed <span class="badge">{{ diff.removed|length }}</span></h4></div>
+      <div class="col-md-3"><h4>Changed <span class="badge">{{ diff.changed|length }}</span></h4></div>
+      <div class="col-md-3"><h4>Unchanged <span class="badge">{{ diff.unchanged|length }}</span></h4></div>
+    </div>
+
+    <table class="table table-bordered table-hover">
+      <thead>
+        <tr><th>Change</th><th>Item</th><th>A revision</th><th>B revision</th></tr>
+      </thead>
+      <tbody>
+        {% for member in diff.added %}
+          <tr class="success">
+            <td>Added</td>
+            <td>{{ member.item_version.item.item_number }}</td>
+            <td class="text-muted">-</td>
+            <td>{{ member.item_version.revision_label }}</td>
+          </tr>
+        {% endfor %}
+        {% for member in diff.removed %}
+          <tr class="danger">
+            <td>Removed</td>
+            <td>{{ member.item_version.item.item_number }}</td>
+            <td>{{ member.item_version.revision_label }}</td>
+            <td class="text-muted">-</td>
+          </tr>
+        {% endfor %}
+        {% for member_a, member_b in diff.changed %}
+          <tr class="warning">
+            <td>Changed</td>
+            <td>{{ member_a.item_version.item.item_number }}</td>
+            <td>{{ member_a.item_version.revision_label }}</td>
+            <td>{{ member_b.item_version.revision_label }}</td>
+          </tr>
+        {% endfor %}
+        {% for member_a, member_b in diff.unchanged %}
+          <tr>
+            <td>Unchanged</td>
+            <td>{{ member_a.item_version.item.item_number }}</td>
+            <td>{{ member_a.item_version.revision_label }}</td>
+            <td>{{ member_b.item_version.revision_label }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <a class="btn btn-default" href="{{ url_for('BaselineCompareView.compare') }}">
+      <i class="fa fa-refresh"></i> Compare other baselines
+    </a>
+
+  {% else %}
+    <p>Select two baselines to compare.</p>
+    <table class="table table-bordered table-hover">
+      <thead><tr><th>Baseline</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for baseline in baselines %}
+          <tr>
+            <td>{{ baseline.baseline_number }} — {{ baseline.baseline_name }}</td>
+            <td>{{ baseline.status }}</td>
+            <td>
+              {% if a_id and a_id != baseline.id %}
+                <a class="btn btn-xs btn-primary"
+                   href="{{ url_for('BaselineCompareView.compare', a=a_id, b=baseline.id) }}">
+                  Compare with A
+                </a>
+              {% elif not a_id %}
+                <a class="btn btn-xs btn-default"
+                   href="{{ url_for('BaselineCompareView.compare', a=baseline.id) }}">
+                  Set as A
+                </a>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+{% endblock %}

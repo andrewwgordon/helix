@@ -1,3 +1,6 @@
+# Pi
+.pi/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -216,3 +219,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Helix PLM local artifacts
+plm.db
+plm.db-wal
+plm.db-shm
+*.sqlite3
+uploads/
