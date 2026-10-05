@@ -8,6 +8,7 @@ from flask import flash, g, redirect, url_for
 from flask_appbuilder import ModelView
 from flask_appbuilder.actions import action
 from flask_appbuilder.models.sqla.interface import SQLAInterface
+from flask_appbuilder.models.sqla.filters import FilterInFunction
 from flask_appbuilder.widgets import ListLinkWidget
 
 from app import db
@@ -15,31 +16,45 @@ from app.models.core import Item, ItemRelationship, ItemVersion
 from app.services import Actor, LifecycleService, RelationshipService
 from app.services.exceptions import PlmError
 from app.views.action_utils import as_items, first_item
+from app.views.filters import lifecycle_state_ids
 from app.views.formatters import item_identity_link, item_version_link, lifecycle_state
+
+
+def apply_lifecycle(versions, method_name, label, redirect_url):
+    """Apply a lifecycle transition to ``versions`` and flash the outcome.
+
+    Shared by :class:`LifecycleActionsMixin` (raw revision rows) and
+    :class:`CurrentVersionLifecycleMixin` (business-object rows) so the
+    draft -> review -> release workflow is available from every working list.
+    Invalid transitions are flashed as errors by the service.
+    """
+    actor = Actor.from_user(g.user)
+    service = LifecycleService(db.session, actor)
+    method = getattr(service, method_name)
+    applied = []
+    for version in versions:
+        try:
+            applied.append(method(version.id, actor))
+        except PlmError as exc:
+            flash(str(exc), "danger")
+            return redirect(redirect_url)
+    if len(applied) == 1:
+        flash(
+            f"{label}. State is now '{applied[0].lifecycle_state.name}'.",
+            "success",
+        )
+    elif applied:
+        flash(f"{label} for {len(applied)} versions.", "success")
+    return redirect(redirect_url)
 
 
 class LifecycleActionsMixin:
     """Service-backed lifecycle transition buttons (spec §14.8)."""
 
     def _apply_lifecycle(self, item, method_name, label):
-        actor = Actor.from_user(g.user)
-        service = LifecycleService(db.session, actor)
-        method = getattr(service, method_name)
-        applied = []
-        for version in as_items(item):
-            try:
-                applied.append(method(version.id, actor))
-            except PlmError as exc:
-                flash(str(exc), "danger")
-                return redirect(self.get_redirect())
-        if len(applied) == 1:
-            flash(
-                f"{label}. State is now '{applied[0].lifecycle_state.name}'.",
-                "success",
-            )
-        elif applied:
-            flash(f"{label} for {len(applied)} versions.", "success")
-        return redirect(self.get_redirect())
+        return apply_lifecycle(
+            as_items(item), method_name, label, self.get_redirect()
+        )
 
     @action(
         "submit_for_review",
@@ -82,7 +97,70 @@ class LifecycleActionsMixin:
         return self._apply_lifecycle(item, "obsolete", "Obsoleted")
 
 
-class ItemModelView(ModelView):
+class CurrentVersionLifecycleMixin:
+    """Lifecycle actions on business-object rows.
+
+    Business list/show rows are subtypes (Part, Document, ...) keyed by the
+    ``ItemVersion`` id. These actions drive the current revision's lifecycle so
+    the whole draft -> review -> release workflow can be run directly from the
+    daily working list instead of the raw revisions table.
+    """
+
+    def _lifecycle_apply(self, item, method_name, label):
+        versions = [record.item_version for record in as_items(item)]
+        return apply_lifecycle(versions, method_name, label, self.get_redirect())
+
+    @action(
+        "submit_for_review",
+        "Submit for review",
+        "Submit the current revision for review?",
+        "fa-paper-plane",
+        single=True,
+    )
+    def submit_for_review(self, item):
+        return self._lifecycle_apply(item, "submit_for_review", "Submitted for review")
+
+    @action("approve", "Approve", "Approve the current revision?", "fa-check", single=True)
+    def approve(self, item):
+        return self._lifecycle_apply(item, "approve", "Approved")
+
+    @action("release", "Release", "Release the current revision?", "fa-flag-checkered", single=True)
+    def release(self, item):
+        return self._lifecycle_apply(item, "release", "Released")
+
+    @action("obsolete", "Obsolete", "Mark the current revision obsolete?", "fa-ban", single=True)
+    def obsolete(self, item):
+        return self._lifecycle_apply(item, "obsolete", "Obsoleted")
+
+
+class AuditTrailActionMixin:
+    """"Audit trail" action that jumps to the filtered audit list.
+
+    Works on any row that carries (directly or through ``item_version``) the
+    ``item_id`` the audit trail is keyed on.
+    """
+
+    def _audit_item_id(self, record):
+        version = getattr(record, "item_version", None)
+        return record.id if version is None else version.item_id
+
+    @action(
+        "audit",
+        "Audit trail",
+        "Show the audit trail for this item?",
+        "fa-history",
+        multiple=False,
+        single=True,
+    )
+    def audit(self, item):
+        record = first_item(item)
+        return redirect(
+            url_for("AuditEventModelView.list")
+            + f"?_flt_0_item_id={self._audit_item_id(record)}"
+        )
+
+
+class ItemModelView(AuditTrailActionMixin, ModelView):
     datamodel = SQLAInterface(Item)
     route_base = "/items"
     list_columns = ["item_number", "item_type", "current_version", "created_on"]
@@ -95,7 +173,7 @@ class ItemModelView(ModelView):
     ]
     search_columns = ["item_number", "item_type"]
     base_order = ("item_number", "asc")
-    base_permissions = ["can_list", "can_show", "revisions"]
+    base_permissions = ["can_list", "can_show", "revisions", "audit"]
     exclude_route_methods = {"add", "edit", "delete"}
     label_columns = {
         "item_number": "Item number",
@@ -129,9 +207,14 @@ class ItemModelView(ModelView):
         )
 
 
+
+
 class ItemVersionModelView(LifecycleActionsMixin, ModelView):
     datamodel = SQLAInterface(ItemVersion)
     route_base = "/itemversions"
+    # Tab caption on the Item show page (embedded via related_views) and the
+    # list page title of the standalone history view.
+    list_title = "Revisions"
     list_columns = [
         "item",
         "revision_label",
@@ -359,3 +442,21 @@ class ItemRelationshipModelView(ModelView):
         if removed:
             flash(f"Removed {removed} relationship(s).", "success")
         return redirect(self.get_redirect())
+
+
+class PendingReviewModelView(ItemVersionModelView):
+    """Reviewer work queue: every revision currently in the REVIEW state.
+
+    A task-oriented, standard FAB ``ModelView`` (no custom template): it is the
+    same revision table as :class:`ItemVersionModelView` but pre-filtered to
+    the states a reviewer must act on, so "what needs my decision" is one menu
+    click. All lifecycle actions are inherited and apply right here.
+    """
+
+    route_base = "/itemversions/pending-review"
+    default_view = "list"
+    list_title = "Pending review"
+    page_size = 50
+    base_filters = [
+        ["lifecycle_state_id", FilterInFunction, lambda: lifecycle_state_ids("REVIEW")]
+    ]

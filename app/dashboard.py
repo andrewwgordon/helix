@@ -35,7 +35,7 @@ class SummaryIndexView(IndexView):
     def _build_summary(self):
         """Return read-only aggregate counts for the dashboard template."""
         from app.models.baseline import Baseline
-        from app.models.business import Document, Part, Product, Requirement
+        from app.models.business import Document, Function, Part, Product, Requirement
         from app.models.core import Item, ItemVersion
         from app.models.reference import LifecycleState
 
@@ -82,6 +82,12 @@ class SummaryIndexView(IndexView):
                 "icon": "fa-camera-retro",
                 "url": url_for("BaselineModelView.list"),
             },
+            {
+                "label": "Functions",
+                "count": count(Function),
+                "icon": "fa-cogs",
+                "url": url_for("FunctionModelView.list"),
+            },
         ]
 
         lifecycle = [
@@ -123,4 +129,58 @@ class SummaryIndexView(IndexView):
             )
         ]
 
-        return {"cards": cards, "lifecycle": lifecycle, "baselines": baselines}
+        # Task-oriented entry points: one-click creation of each object type
+        # (standard service-backed SimpleFormViews, no menu entries) and the
+        # reviewer's pending-review queue.
+        quick_actions = [
+            {
+                "label": "New product",
+                "icon": "fa-cubes",
+                "url": url_for("ProductCreateView.this_form_get"),
+            },
+            {
+                "label": "New part",
+                "icon": "fa-cube",
+                "url": url_for("PartCreateView.this_form_get"),
+            },
+            {
+                "label": "New document",
+                "icon": "fa-file-text-o",
+                "url": url_for("DocumentCreateView.this_form_get"),
+            },
+            {
+                "label": "New requirement",
+                "icon": "fa-check-square-o",
+                "url": url_for("RequirementCreateView.this_form_get"),
+            },
+            {
+                "label": "New function",
+                "icon": "fa-cogs",
+                "url": url_for("FunctionCreateView.this_form_get"),
+            },
+            {
+                "label": "New baseline",
+                "icon": "fa-camera-retro",
+                "url": url_for("BaselineCreateView.this_form_get"),
+            },
+        ]
+
+        pending_review_count = (
+            db.session.query(func.count())
+            .select_from(ItemVersion)
+            .join(LifecycleState, ItemVersion.lifecycle_state_id == LifecycleState.id)
+            .filter(LifecycleState.code == "REVIEW")
+            .scalar()
+            or 0
+        )
+
+        return {
+            "cards": cards,
+            "lifecycle": lifecycle,
+            "baselines": baselines,
+            "quick_actions": quick_actions,
+            "pending_review": {
+                "count": pending_review_count,
+                "url": url_for("PendingReviewModelView.list"),
+            },
+        }

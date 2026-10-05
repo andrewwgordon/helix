@@ -125,6 +125,12 @@ class ItemVersion(AuditMixin, Model):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    function = relationship(
+        "Function",
+        back_populates="item_version",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         UniqueConstraint(

@@ -12,6 +12,22 @@
   </div>
 
   <div class="row">
+    <div class="col-md-12">
+      <div class="btn-group" role="group">
+        {% for quick_action in summary.quick_actions %}
+        <a href="{{ quick_action.url }}" class="btn btn-default">
+          <i class="fa {{ quick_action.icon }}"></i> {{ _(quick_action.label) }}
+        </a>
+        {% endfor %}
+      </div>
+      <a href="{{ summary.pending_review.url }}" class="btn btn-warning pull-right">
+        <i class="fa fa-inbox"></i>
+        {{ _("Pending review") }}: {{ summary.pending_review.count }}
+      </a>
+    </div>
+  </div>
+
+  <div class="row">
     {% for card in summary.cards %}
     <div class="col-lg-2 col-md-4 col-sm-6">
       <a href="{{ card.url }}" class="thumbnail text-center">

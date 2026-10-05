@@ -79,6 +79,20 @@ def boolean_flag(value):
     return _badge("Yes", "success") if value else _badge("No", "default")
 
 
+def download_link(value):
+    """Render a download URL (e.g. ``Document.download_url``) as a link.
+
+    Used on the standard list/show widgets so users can open the current
+    document in one click without any custom template.
+    """
+    if not value:
+        return ""
+    return Markup(
+        f'<a class="btn btn-xs btn-default" href="{value}">'
+        '<i class="fa fa-download"></i> Open</a>'
+    )
+
+
 def item_link(value):
     """Render an ``Item`` id as a link to its show page."""
     if not value:

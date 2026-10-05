@@ -23,6 +23,23 @@ def current_version_ids():
     ]
 
 
+def lifecycle_state_ids(*codes):
+    """Return the ids of lifecycle states matching ``codes``.
+
+    Intended for ``FilterInFunction`` on ``ItemVersion.lifecycle_state_id``, so
+    task-oriented list views (e.g. the "Pending Review" queue) can restrict to
+    specific workflow states without any custom template.
+    """
+    from app.models.reference import LifecycleState
+
+    return [
+        row[0]
+        for row in db.session.query(LifecycleState.id)
+        .filter(LifecycleState.code.in_(codes))
+        .all()
+    ]
+
+
 def current_version_filter():
     """Build a fresh ``base_filters`` list restricting to current revisions."""
     from flask_appbuilder.models.sqla.filters import FilterInFunction

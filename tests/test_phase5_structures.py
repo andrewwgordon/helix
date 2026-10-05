@@ -104,7 +104,9 @@ def test_add_child_through_form(admin_client, app):
         root = _product(db.session, "T-P5-FORM-PRD")
         child = _part(db.session, "T-P5-FORM-CHILD")
         parent_version_id = root.item_version_id
-        child_item_number = child.item.item_number
+        # The form's child picker (QuerySelectField) uses the child item's
+        # current version id as the option value.
+        child_version_id = child.item.current_version_id
 
     get_response = admin_client.get(
         f"/structures/add-child/form?parent_version_id={parent_version_id}"
@@ -115,7 +117,7 @@ def test_add_child_through_form(admin_client, app):
         "/structures/add-child/form",
         data={
             "parent_version_id": str(parent_version_id),
-            "item_number": child_item_number,
+            "child": str(child_version_id),
             "quantity": "3",
             "find_number": "40",
         },
@@ -133,7 +135,7 @@ def test_add_child_through_form(admin_client, app):
         assert child_node["relationship"].find_number == "40"
 
 
-def test_unknown_item_number_flashes_error(admin_client, app):
+def test_missing_child_flashes_error(admin_client, app):
     with app.app_context():
         root = _product(db.session, "T-P5-ERR-PRD")
         parent_version_id = root.item_version_id
@@ -142,10 +144,17 @@ def test_unknown_item_number_flashes_error(admin_client, app):
         "/structures/add-child/form",
         data={
             "parent_version_id": str(parent_version_id),
-            "item_number": "DOES-NOT-EXIST",
+            "child": "999999",
         },
     )
-    assert response.status_code == 302
+    # An unknown child fails form validation; the form is re-rendered (200)
+    # with the field error attached and no relationship is created.
+    assert response.status_code == 200
+    with app.app_context():
+        tree = RelationshipService(db.session).build_tree(
+            parent_version_id, direction="down"
+        )
+        assert tree["children"] == []
     with app.app_context():
         # No relationship was created.
         tree = RelationshipService(db.session).build_tree(

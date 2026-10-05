@@ -8,7 +8,7 @@ import pytest
 
 from app import db
 from app.models.baseline import Baseline
-from app.models.business import Document, Part, Product, Requirement
+from app.models.business import Document, Function, Part, Product, Requirement
 from app.models.core import Item, ItemVersion
 from app.services import RelationshipService
 from app.uav_seed import (
@@ -50,12 +50,58 @@ def test_dataset_counts(uav):
     assert uav["requirements"] == 27
     assert uav["parts"] == 32
     assert uav["documents"] == 6
+    assert uav["functions"] == 15
     assert uav["product_versions"] == 2
 
     assert db.session.query(Product).count() >= 1
     assert db.session.query(Requirement).count() >= 27
     assert db.session.query(Part).count() >= 32
     assert db.session.query(Document).count() >= 6
+    assert db.session.query(Function).count() >= 15
+
+
+def test_product_performs_top_level_functions(uav):
+    product = db.session.query(Item).filter_by(item_number=PRODUCT_NUMBER).one()
+    performed = RelationshipService(db.session).get_downstream(
+        product.current_version_id, relationship_type="PERFORMS"
+    )
+    numbers = {version.item.item_number for version in performed}
+    assert numbers == {
+        "FUN-0100", "FUN-0200", "FUN-0300", "FUN-0400", "FUN-0500", "FUN-0600"
+    }
+
+
+def test_function_breakdown_hierarchy(uav):
+    rel = RelationshipService(db.session)
+
+    def _function_version(number):
+        item = db.session.query(Item).filter_by(item_number=number).one()
+        return item.current_version
+
+    lift = _function_version("FUN-0100")
+    children = rel.get_downstream(lift.id, relationship_type="CONTAINS")
+    assert {v.item.item_number for v in children} == {"FUN-0110", "FUN-0120"}
+
+    # A child function has exactly one parent: where-used is the breakdown.
+    thrust = _function_version("FUN-0110")
+    parents = rel.get_upstream(thrust.id, relationship_type="CONTAINS")
+    assert [v.item.item_number for v in parents] == ["FUN-0100"]
+
+
+def test_parts_fulfill_functions(uav):
+    rel = RelationshipService(db.session)
+
+    def _function_version(number):
+        item = db.session.query(Item).filter_by(item_number=number).one()
+        return item.current_version
+
+    thrust = _function_version("FUN-0110")
+    fulfilling = rel.get_upstream(thrust.id, relationship_type="FULFILLS")
+    assert {v.item.item_number for v in fulfilling} == {"PRT-MOTOR", "PRT-PROP"}
+
+    battery = _function_version("FUN-0310")
+    fulfilling = rel.get_upstream(battery.id, relationship_type="FULFILLS")
+    assert {v.item.item_number for v in fulfilling} == {"PRT-BATT", "PRT-BATT-BMS"}
 
 
 def test_product_has_two_revisions(uav):

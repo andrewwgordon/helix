@@ -24,6 +24,7 @@ ITEM_TYPES = [
     ("Document", "Document"),
     ("Requirement", "Requirement"),
     ("Product", "Product"),
+    ("Function", "Function"),
 ]
 
 LIFECYCLE_STATES = [
@@ -43,6 +44,10 @@ RELATIONSHIP_TYPES = [
     ("SATISFIES", "Satisfies", False, False, False),
     ("DERIVED_FROM", "Derived From", False, False, False),
     ("RELATED_TO", "Related To", False, False, False),
+    # Functional breakdown: a product performs functions, a function breaks
+    # down into child functions via CONTAINS, and a part fulfils functions.
+    ("PERFORMS", "Performs", False, False, False),
+    ("FULFILLS", "Fulfills", False, False, False),
 ]
 
 # from_code, to_code, required_role_name

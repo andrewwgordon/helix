@@ -33,6 +33,8 @@ from app.views.formatters import baseline_status, item_version_link, lifecycle_s
 class BaselineMemberModelView(ModelView):
     datamodel = SQLAInterface(BaselineMember)
     route_base = "/baselinemembers"
+    # Tab caption on the Baseline show page (embedded via related_views).
+    list_title = "Members"
     list_columns = [
         "item_version.item.item_number",
         "item_version.revision_label",

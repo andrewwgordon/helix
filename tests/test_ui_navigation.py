@@ -66,7 +66,10 @@ def test_revision_list_links_back_to_item(admin_client, app):
         ItemService(db.session).create_version(item.id, actor)
         item_id = item.id
 
-    response = admin_client.get("/itemversions/list/")
+    # Filter to this item's revisions (same URL the "Revisions" action
+    # targets) so the row is on the first page regardless of the shared
+    # session database size.
+    response = admin_client.get(f"/itemversions/list/?_flt_0_item={item_id}")
     assert response.status_code == 200
     assert b"T-NAV-LINK" in response.data
     assert f"/items/show/{item_id}".encode() in response.data

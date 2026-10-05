@@ -7,7 +7,7 @@ rely on that side effect.
 
 from app.models.audit import AuditEvent
 from app.models.baseline import Baseline, BaselineMember
-from app.models.business import Document, Part, Product, Requirement
+from app.models.business import Document, Function, Part, Product, Requirement
 from app.models.core import Item, ItemRelationship, ItemVersion
 from app.models.reference import (
     ItemType,
@@ -27,6 +27,7 @@ __all__ = [
     "Baseline",
     "BaselineMember",
     "Document",
+    "Function",
     "Item",
     "ItemRelationship",
     "ItemVersion",

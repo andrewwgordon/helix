@@ -18,7 +18,7 @@ from wtforms import DecimalField, HiddenField, StringField
 from wtforms.validators import DataRequired, NumberRange, Optional
 
 from app import db
-from app.models.core import Item
+from app.models.core import Item, ItemVersion
 from app.models.reference import ItemType
 from app.services import Actor, RelationshipService
 from app.services.exceptions import PlmError
@@ -74,11 +74,16 @@ class StructureTreeView(BaseView):
 
 
 def _child_candidates():
-    """Items that have a current version and can be structural children."""
+    """Items that have a current version and can be structure children.
+
+    Parts/Products extend the product structure (BOM); Functions extend the
+    functional breakdown (performed by the parent product, or nested under a
+    parent function).
+    """
     return (
         db.session.query(Item)
         .join(ItemType, Item.item_type_id == ItemType.id)
-        .filter(ItemType.code.in_(("Part", "Product")))
+        .filter(ItemType.code.in_(("Part", "Product", "Function")))
         .filter(Item.current_version_id.isnot(None))
         .order_by(Item.item_number.asc())
         .all()
@@ -98,7 +103,11 @@ class StructureChildForm(DynamicForm):
         get_label=_child_label,
         validators=[DataRequired()],
         widget=Select2Widget(),
-        description="Only Part/Product items with a current revision are listed.",
+        description=(
+            "Only Part/Product/Function items with a current revision are "
+            "listed. A function child under a product records a PERFORMS "
+            "link; under a function it extends the functional breakdown."
+        ),
     )
     quantity = DecimalField(
         "Quantity",
@@ -132,11 +141,27 @@ class StructureChildAddView(ServiceFormMixin, SimpleFormView):
             return redirect(url_for("ItemModelView.list"))
 
         child_item = form.child.data
+        parent_version = db.session.get(ItemVersion, parent_version_id)
+        if parent_version is None:
+            flash("Parent version not found.", "danger")
+            return redirect(url_for("ItemModelView.list"))
+
+        # Containment semantics by item type: product structure (BOM) and the
+        # functional breakdown both use structural CONTAINS edges, while a
+        # function attached directly to a product is a PERFORMS link.
+        parent_type = parent_version.item.item_type.code
+        if parent_type == "Function":
+            relationship_type = "CONTAINS"
+        elif child_item.item_type.code == "Function":
+            relationship_type = "PERFORMS"
+        else:
+            relationship_type = "CONTAINS"
+
         try:
             RelationshipService(db.session, actor).add_relationship(
                 parent_version_id,
                 child_item.current_version_id,
-                "CONTAINS",
+                relationship_type,
                 actor,
                 quantity=form.quantity.data,
                 find_number=form.find_number.data or None,
@@ -149,4 +174,69 @@ class StructureChildAddView(ServiceFormMixin, SimpleFormView):
 
         return redirect(
             url_for("StructureTreeView.tree", version_id=parent_version_id)
+        )
+
+
+def _fulfilling_part_candidates():
+    """Parts with a current revision that can fulfil a function."""
+    return (
+        db.session.query(Item)
+        .join(ItemType, Item.item_type_id == ItemType.id)
+        .filter(ItemType.code == "Part")
+        .filter(Item.current_version_id.isnot(None))
+        .order_by(Item.item_number.asc())
+        .all()
+    )
+
+
+class FunctionFulfillmentForm(DynamicForm):
+    function_version_id = HiddenField()
+    part = QuerySelectField(
+        "Fulfilling part",
+        query_func=_fulfilling_part_candidates,
+        get_pk_func=lambda item: item.current_version_id,
+        get_label=_child_label,
+        validators=[DataRequired()],
+        widget=Select2Widget(),
+        description="Only Part items with a current revision are listed.",
+    )
+
+
+class FunctionFulfillmentAddView(ServiceFormMixin, SimpleFormView):
+    """Link a part that fulfils a function (a FULFILLS edge)."""
+
+    route_base = "/functions/add-fulfillment"
+    form = FunctionFulfillmentForm
+    form_title = "Add fulfilling part"
+    edit_fieldsets = [
+        ("Fulfillment", {"fields": ["part"]}),
+    ]
+
+    def form_get(self, form):
+        form.function_version_id.data = request.args.get("function_version_id")
+
+    def form_post(self, form):
+        actor = Actor.from_user(g.user)
+        try:
+            function_version_id = int(form.function_version_id.data)
+        except (TypeError, ValueError):
+            flash("Missing function version.", "danger")
+            return redirect(url_for("FunctionModelView.list"))
+
+        part_item = form.part.data
+        try:
+            RelationshipService(db.session, actor).add_relationship(
+                part_item.current_version_id,
+                function_version_id,
+                "FULFILLS",
+                actor,
+            )
+            flash("Part linked as fulfilling the function.", "success")
+        except PlmError as exc:
+            if self.attach_field_error(form, exc):
+                return self.render_service_form(form)
+            flash(str(exc), "danger")
+
+        return redirect(
+            url_for("FunctionModelView.show", pk=function_version_id)
         )

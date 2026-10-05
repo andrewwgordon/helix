@@ -1,0 +1,26 @@
+.                                                                        [100%]
+============================== warnings summary ===============================
+tests/test_ui_navigation.py::test_revision_list_links_back_to_item
+tests/test_ui_navigation.py::test_revision_list_links_back_to_item
+tests/test_ui_navigation.py::test_revision_list_links_back_to_item
+tests/test_ui_navigation.py::test_revision_list_links_back_to_item
+tests/test_ui_navigation.py::test_revision_list_links_back_to_item
+tests/test_ui_navigation.py::test_revision_list_links_back_to_item
+tests/test_ui_navigation.py::test_revision_list_links_back_to_item
+tests/test_ui_navigation.py::test_revision_list_links_back_to_item
+  C:\Users\andre\Workspace\helix\.venv\Lib\site-packages\flask_appbuilder\security\sqla\manager.py:136: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    timestamp=datetime.utcnow(),
+
+tests/test_ui_navigation.py::test_revision_list_links_back_to_item
+tests/test_ui_navigation.py::test_revision_list_links_back_to_item
+tests/test_ui_navigation.py::test_revision_list_links_back_to_item
+tests/test_ui_navigation.py::test_revision_list_links_back_to_item
+tests/test_ui_navigation.py::test_revision_list_links_back_to_item
+tests/test_ui_navigation.py::test_revision_list_links_back_to_item
+tests/test_ui_navigation.py::test_revision_list_links_back_to_item
+tests/test_ui_navigation.py::test_revision_list_links_back_to_item
+  C:\Users\andre\Workspace\helix\.venv\Lib\site-packages\flask_appbuilder\security\sqla\manager.py:170: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    timestamp=datetime.utcnow(),
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+1 passed, 16 warnings in 2.12s

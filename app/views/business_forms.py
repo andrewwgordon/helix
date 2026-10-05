@@ -32,6 +32,7 @@ from app.models.reference import (
 from app.services import (
     Actor,
     DocumentService,
+    FunctionService,
     PartService,
     ProductService,
     RequirementService,
@@ -275,6 +276,55 @@ class RequirementCreateView(ServiceFormMixin, SimpleFormView):
                 return self.render_service_form(form)
             flash(str(exc), "danger")
         return redirect(url_for("RequirementModelView.list"))
+
+
+class FunctionForm(DynamicForm):
+    item_number = StringField(
+        "Item number",
+        validators=[DataRequired()],
+        widget=BS3TextFieldWidget(),
+        description="Stable business identity, e.g. FUN-0001.",
+    )
+    description = TextAreaField(
+        "Description",
+        widget=BS3TextAreaFieldWidget(),
+        description="Optional summary of this revision.",
+    )
+    function_text = TextAreaField(
+        "Function",
+        validators=[DataRequired()],
+        widget=BS3TextAreaFieldWidget(),
+        description="What the function must achieve.",
+    )
+
+
+class FunctionCreateView(ServiceFormMixin, SimpleFormView):
+    route_base = "/functions/create"
+    form = FunctionForm
+    form_title = "Create Function"
+    edit_fieldsets = [
+        ("Identification", {"fields": ["item_number", "description"]}),
+        ("Function", {"fields": ["function_text"]}),
+    ]
+
+    def form_post(self, form):
+        actor = Actor.from_user(g.user)
+        try:
+            result = FunctionService(db.session, actor).create_function(
+                form.item_number.data,
+                actor,
+                function_text=form.function_text.data,
+                description=form.description.data or None,
+            )
+            flash(
+                f"Created function {result.item_version.item.item_number}.",
+                "success",
+            )
+        except PlmError as exc:
+            if self.attach_field_error(form, exc):
+                return self.render_service_form(form)
+            flash(str(exc), "danger")
+        return redirect(url_for("FunctionModelView.list"))
 
 
 class DocumentForm(DynamicForm):

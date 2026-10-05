@@ -39,6 +39,7 @@ from app.services import (
     Actor,
     BaselineService,
     DocumentService,
+    FunctionService,
     LifecycleService,
     PartService,
     ProductService,
@@ -232,6 +233,113 @@ REQUIREMENT_REVISIONS = {
 }
 
 # ---------------------------------------------------------------------------
+# Functions: functional breakdown of the HoverX-4.
+#
+# The product PERFORMS the six top-level functions; a function breaks down
+# into child functions through structural CONTAINS edges; parts FULFILL
+# functions.
+# (item_number, function_text, description)
+# ---------------------------------------------------------------------------
+FUNCTIONS = [
+    (
+        "FUN-0100", "Generate lift",
+        "Aerodynamic lift generation through rotor thrust.",
+    ),
+    (
+        "FUN-0110", "Generate rotor thrust",
+        "Convert electrical power into rotor thrust at each rotor station.",
+    ),
+    (
+        "FUN-0120", "Control rotor speed",
+        "Regulate each rotor's speed on flight-controller command.",
+    ),
+    (
+        "FUN-0200", "Control vehicle",
+        "Stabilise and steer the vehicle in flight.",
+    ),
+    (
+        "FUN-0210", "Sense attitude and altitude",
+        "Measure vehicle attitude, rate and barometric altitude.",
+    ),
+    (
+        "FUN-0220", "Execute flight control laws",
+        "Compute attitude/rate control and flight-mode logic at 400 Hz.",
+    ),
+    (
+        "FUN-0230", "Receive RC commands",
+        "Receive operator control commands over the RC link.",
+    ),
+    (
+        "FUN-0300", "Supply electrical power",
+        "Provide and condition electrical power to all onboard consumers.",
+    ),
+    (
+        "FUN-0310", "Store energy",
+        "Store rechargeable energy for the planned endurance.",
+    ),
+    (
+        "FUN-0320", "Distribute power",
+        "Route conditioned power to rotors, avionics and payload.",
+    ),
+    (
+        "FUN-0400", "Provide command and control link",
+        "Maintain the bidirectional operator-to-vehicle link up to 5 km.",
+    ),
+    (
+        "FUN-0410", "Operate handheld console",
+        "Provide the handheld operator control console.",
+    ),
+    (
+        "FUN-0420", "Telemeter vehicle state",
+        "Transmit vehicle telemetry and receive uplinked commands.",
+    ),
+    (
+        "FUN-0500", "Carry inspection payload",
+        "Stabilise and carry the 1 kg inspection camera payload.",
+    ),
+    (
+        "FUN-0600", "Provide structure and landing",
+        "Carry structural loads and support ground handling/landing.",
+    ),
+]
+
+# Functional breakdown edges: (parent function, child function). Structural
+# CONTAINS edges between function versions, browsable via the structure tree.
+FUNCTION_BREAKDOWN = [
+    ("FUN-0100", "FUN-0110"),
+    ("FUN-0100", "FUN-0120"),
+    ("FUN-0200", "FUN-0210"),
+    ("FUN-0200", "FUN-0220"),
+    ("FUN-0200", "FUN-0230"),
+    ("FUN-0300", "FUN-0310"),
+    ("FUN-0300", "FUN-0320"),
+    ("FUN-0400", "FUN-0410"),
+    ("FUN-0400", "FUN-0420"),
+]
+
+# Parts fulfilling functions: (part, function, FULFILLS).
+PART_FUNCTION_LINKS = [
+    ("PRT-MOTOR", "FUN-0110"),
+    ("PRT-PROP", "FUN-0110"),
+    ("PRT-ESC", "FUN-0120"),
+    ("PRT-IMU", "FUN-0210"),
+    ("PRT-BARO", "FUN-0210"),
+    ("PRT-FC", "FUN-0220"),
+    ("PRT-RC", "FUN-0230"),
+    ("PRT-BATT", "FUN-0310"),
+    ("PRT-BATT-BMS", "FUN-0310"),
+    ("PRT-PDB", "FUN-0320"),
+    ("PRT-HHC", "FUN-0410"),
+    ("PRT-TEL", "FUN-0420"),
+    ("PRT-ANT", "FUN-0420"),
+    ("PRT-GIMBAL", "FUN-0500"),
+    ("PRT-CAM", "FUN-0500"),
+    ("PRT-FRAME", "FUN-0600"),
+    ("PRT-ARMS", "FUN-0600"),
+    ("PRT-LANDING", "FUN-0600"),
+]
+
+# ---------------------------------------------------------------------------
 # Parts: (item_number, name, uom, make_buy, weight_kg, material)
 # ---------------------------------------------------------------------------
 PARTS = [
@@ -411,6 +519,7 @@ ALL_ITEM_NUMBERS = (
     + [p[0] for p in PARTS]
     + [d[0] for d in DOCUMENTS]
     + [r[0] for r in REQUIREMENTS]
+    + [f[0] for f in FUNCTIONS]
 )
 
 
@@ -481,6 +590,7 @@ def seed_uav(session, sm=None, actor: Actor = None) -> dict:
     products_svc = ProductService(session, actor)
     requirements_svc = RequirementService(session, actor)
     documents_svc = DocumentService(session, actor)
+    functions_svc = FunctionService(session, actor)
     relationships = RelationshipService(session, actor)
 
     # --- Product identity + first revision -------------------------------
@@ -538,6 +648,35 @@ def seed_uav(session, sm=None, actor: Actor = None) -> dict:
             requirement_text=text,
         )
 
+    # --- Functions (functional breakdown) --------------------------------
+    functions = {}
+    for number, function_text, description in FUNCTIONS:
+        functions[number] = functions_svc.create_function(
+            number,
+            actor,
+            function_text=function_text,
+            description=description,
+        )
+
+    # Parent/child function breakdown (structural CONTAINS edges between
+    # function versions).
+    for parent, child in FUNCTION_BREAKDOWN:
+        relationships.add_relationship(
+            functions[parent].item_version_id,
+            functions[child].item_version_id,
+            "CONTAINS",
+            actor,
+        )
+
+    # The product performs the six top-level functions (PERFORMS edges).
+    for number in ("FUN-0100", "FUN-0200", "FUN-0300", "FUN-0400", "FUN-0500", "FUN-0600"):
+        relationships.add_relationship(
+            product.item_version_id,
+            functions[number].item_version_id,
+            "PERFORMS",
+            actor,
+        )
+
     # --- Product structure (three levels of parts) -----------------------
     def _version_id(number: str) -> int:
         if number in parts:
@@ -572,6 +711,15 @@ def seed_uav(session, sm=None, actor: Actor = None) -> dict:
             _version_id(source), _version_id(target), rel_type, actor
         )
 
+    # Parts fulfilling functions (FULFILLS edges: part -> function).
+    for part_number, function_number in PART_FUNCTION_LINKS:
+        relationships.add_relationship(
+            parts[part_number].item_version_id,
+            functions[function_number].item_version_id,
+            "FULFILLS",
+            actor,
+        )
+
     # --- Product revision B (copies the structure + links) ---------------
     product_b = products_svc.revise_product(
         product.item_version.item_id, "major", actor, platform="HX4-B"
@@ -582,6 +730,8 @@ def seed_uav(session, sm=None, actor: Actor = None) -> dict:
         _advance(session, actor, part.item_version, "APPROVED")
     for document in documents.values():
         _advance(session, actor, document.item_version, "APPROVED")
+    for function in functions.values():
+        _advance(session, actor, function.item_version, "APPROVED")
 
     # --- Lifecycle: requirements to their seeded states ------------------
     for number, _kind, _title, _text, status, _priority, _verify in REQUIREMENTS:
@@ -612,6 +762,7 @@ def seed_uav(session, sm=None, actor: Actor = None) -> dict:
         "parts": len(parts),
         "documents": len(documents),
         "requirements": len(requirements),
+        "functions": len(functions),
         "relationships": session.query(ItemRelationship)
         .filter(
             ItemRelationship.source_item_version_id.in_(seeded_version_ids)

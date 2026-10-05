@@ -1,0 +1,60 @@
+......................................................F................. [ 40%]
+........................................................................ [ 81%]
+................................                                         [100%]
+================================== FAILURES ===================================
+____________________ test_revision_list_links_back_to_item ____________________
+
+admin_client = <FlaskClient <Flask 'app'>>, app = <Flask 'app'>
+
+    def test_revision_list_links_back_to_item(admin_client, app):
+        with app.app_context():
+            actor = _actor()
+            item = ItemService(db.session).create_item("Part", "T-NAV-LINK", actor)
+            ItemService(db.session).create_version(item.id, actor)
+            item_id = item.id
+    
+        response = admin_client.get("/itemversions/list/")
+        assert response.status_code == 200
+        assert b"T-NAV-LINK" in response.data
+>       assert f"/items/show/{item_id}".encode() in response.data
+E       assert b'/items/show/56' in b'\n\n\n  \n\n\n<!DOCTYPE html>\n<html>\n  <head>\n    <title>Helix PLM</title>\n\n    \n      <meta name="viewport" c...    <script src="/static/appbuilder/js/ab.js" nonce=""></script>\n    \n\n    \n    \n\n    \n    \n  </body>\n</html>'
+E        +  where b'/items/show/56' = <built-in method encode of str object at 0x00000273CB303A70>()
+E        +    where <built-in method encode of str object at 0x00000273CB303A70> = '/items/show/56'.encode
+E        +  and   b'\n\n\n  \n\n\n<!DOCTYPE html>\n<html>\n  <head>\n    <title>Helix PLM</title>\n\n    \n      <meta name="viewport" c...    <script src="/static/appbuilder/js/ab.js" nonce=""></script>\n    \n\n    \n    \n\n    \n    \n  </body>\n</html>' = <WrapperTestResponse 66910 bytes [200 OK]>.data
+
+tests\test_ui_navigation.py:72: AssertionError
+============================== warnings summary ===============================
+tests/test_dashboard.py::test_index_view_is_summary_dashboard
+tests/test_dashboard.py::test_index_view_is_summary_dashboard
+tests/test_dashboard.py::test_index_view_is_summary_dashboard
+tests/test_dashboard.py::test_index_view_is_summary_dashboard
+tests/test_dashboard.py::test_index_view_is_summary_dashboard
+tests/test_dashboard.py::test_index_view_is_summary_dashboard
+tests/test_dashboard.py::test_dashboard_renders
+tests/test_dashboard.py::test_dashboard_renders
+  C:\Users\andre\Workspace\helix\.venv\Lib\site-packages\flask_appbuilder\security\sqla\manager.py:136: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    timestamp=datetime.utcnow(),
+
+tests/test_dashboard.py::test_index_view_is_summary_dashboard
+tests/test_dashboard.py::test_index_view_is_summary_dashboard
+tests/test_dashboard.py::test_index_view_is_summary_dashboard
+tests/test_dashboard.py::test_index_view_is_summary_dashboard
+tests/test_dashboard.py::test_index_view_is_summary_dashboard
+tests/test_dashboard.py::test_index_view_is_summary_dashboard
+tests/test_dashboard.py::test_dashboard_renders
+tests/test_dashboard.py::test_dashboard_renders
+  C:\Users\andre\Workspace\helix\.venv\Lib\site-packages\flask_appbuilder\security\sqla\manager.py:170: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    timestamp=datetime.utcnow(),
+
+tests/test_function_object.py: 12 warnings
+tests/test_product_tabs.py: 48 warnings
+tests/test_ui_navigation.py: 4 warnings
+tests/test_ui_quick_wins.py: 2 warnings
+tests/test_ui_task_flow.py: 2 warnings
+  C:\Users\andre\Workspace\helix\.venv\Lib\site-packages\flask_appbuilder\models\sqla\interface.py:916: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+    return self.session.query(rel_model).get(value)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_ui_navigation.py::test_revision_list_links_back_to_item - a...
+1 failed, 175 passed, 84 warnings in 6.62s
