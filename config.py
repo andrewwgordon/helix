@@ -32,12 +32,11 @@ class BaseConfig:
     BABEL_DEFAULT_LOCALE = "en"
     BABEL_DEFAULT_TIMEZONE = "UTC"
 
-    # --- SQLAlchemy / SQLite -------------------------------------------
+    # --- SQLAlchemy -----------------------------------------------------
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        # Required because FAB may touch the connection from worker threads.
-        "connect_args": {"check_same_thread": False},
-    }
+    # SQLite-only connect args; other drivers (PostgreSQL, ...) reject them.
+    # Required because FAB may touch the connection from worker threads.
+    SQLITE_ENGINE_OPTIONS = {"connect_args": {"check_same_thread": False}}
 
     # --- Document uploads ----------------------------------------------
     UPLOAD_FOLDER = os.path.join(basedir, "uploads")
@@ -50,12 +49,18 @@ class BaseConfig:
 class DevelopmentConfig(BaseConfig):
     DEBUG = True
     SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL", _DEFAULT_SQLITE_URI)
+    SQLALCHEMY_ENGINE_OPTIONS = (
+        BaseConfig.SQLITE_ENGINE_OPTIONS
+        if SQLALCHEMY_DATABASE_URI.startswith("sqlite")
+        else {}
+    )
 
 
 class TestConfig(BaseConfig):
     TESTING = True
     DEBUG = False
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    SQLALCHEMY_ENGINE_OPTIONS = BaseConfig.SQLITE_ENGINE_OPTIONS
     WTF_CSRF_ENABLED = False
     # FAB must create its own security tables on init; our app tables are
     # created by db.create_all() in the factory.
@@ -65,6 +70,11 @@ class TestConfig(BaseConfig):
 class ProductionConfig(BaseConfig):
     DEBUG = False
     SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL", _DEFAULT_SQLITE_URI)
+    SQLALCHEMY_ENGINE_OPTIONS = (
+        BaseConfig.SQLITE_ENGINE_OPTIONS
+        if SQLALCHEMY_DATABASE_URI.startswith("sqlite")
+        else {}
+    )
     # Alembic owns schema creation/upgrades in production.
     FAB_CREATE_DB = False
 
